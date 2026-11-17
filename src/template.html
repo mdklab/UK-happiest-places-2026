@@ -1,0 +1,952 @@
+<title>Карта счастья Британии</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="Интерактивная карта 25 самых счастливых и 25 самых несчастливых мест Великобритании по индексу Rightmove Happy at Home 2026.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700&family=Onest:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one-screen app. A scrolling sidebar (title, facts, place card, two ranked lists) sits beside a zoomable map of Great Britain with a London inset; on phones it stacks map-first. Poster mode re-flows the same parts into a 1080×1350 card for Telegram. */
+:root {
+  --bg: #eef2f3;
+  --panel: #ffffff;
+  --ink: #14202a;
+  --muted: #56646d;
+  --line: #d8e0e4;
+  --sea: #cddce4;
+  --land: #fbfcfc;
+  --land-far: #e3e9e8;
+  --coast: #9cb0ba;
+  --borough: #eef2f2;
+  --borough-line: #c2cdd2;
+  --happy: #0b8566;
+  --happy-soft: #d7efe6;
+  --sad: #c93b31;
+  --sad-soft: #f9dfdb;
+  --on-mark: #ffffff;
+  --halo: #fbfcfc;
+  --focus: #1f5fbf;
+  --shadow: 0 1px 2px rgb(20 32 42 / .06), 0 8px 24px rgb(20 32 42 / .09);
+  --display: "Unbounded", "Arial Black", system-ui, sans-serif;
+  --body: "Onest", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c1318; --panel: #141e25; --ink: #e5ecef; --muted: #93a3ac; --line: #25333c;
+    --sea: #0e1a22; --land: #22303a; --land-far: #18232a; --coast: #3a4b56;
+    --borough: #2a3843; --borough-line: #42545f;
+    --happy: #2fbf95; --happy-soft: #123a30; --sad: #f0675c; --sad-soft: #44201c;
+    --on-mark: #0b1216; --halo: #22303a; --focus: #82b2ff;
+    --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 8px 24px rgb(0 0 0 / .35);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0c1318; --panel: #141e25; --ink: #e5ecef; --muted: #93a3ac; --line: #25333c;
+  --sea: #0e1a22; --land: #22303a; --land-far: #18232a; --coast: #3a4b56;
+  --borough: #2a3843; --borough-line: #42545f;
+  --happy: #2fbf95; --happy-soft: #123a30; --sad: #f0675c; --sad-soft: #44201c;
+  --on-mark: #0b1216; --halo: #22303a; --focus: #82b2ff;
+  --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 8px 24px rgb(0 0 0 / .35);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 15px/1.45 var(--body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+a { color: inherit; }
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(330px, 410px) minmax(0, 1fr);
+  gap: 16px;
+}
+.side {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 4px 6px 8px 2px;
+  scrollbar-width: thin;
+}
+
+/* Header */
+.eyebrow {
+  display: flex; align-items: center; gap: 8px;
+  font: 600 11.5px/1.2 var(--body);
+  letter-spacing: .09em; text-transform: uppercase; color: var(--muted);
+}
+.eyebrow svg { flex: none; }
+h1 {
+  margin: 10px 0 8px;
+  font: 600 clamp(21px, 1.9vw, 26px)/1.2 var(--display);
+  letter-spacing: -.01em;
+  text-wrap: balance;
+}
+h1 .h { color: var(--happy); }
+h1 .s { color: var(--sad); }
+.dek { margin: 0 0 14px; color: var(--muted); font-size: 14.5px; max-width: 60ch; }
+.seg {
+  display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+}
+.seg button {
+  border: 0; background: transparent; cursor: pointer;
+  padding: 7px 11px; border-radius: 8px; font-weight: 600; font-size: 13.5px;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.seg button span { color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.seg button:hover { background: var(--bg); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.seg button[aria-pressed="true"] span { color: inherit; opacity: .7; }
+
+/* Glyphs that match the map markers: circle = happiest, rounded square = unhappiest */
+.g { display: inline-block; flex: none; width: 10px; height: 10px; }
+.g.happy { border-radius: 50%; background: var(--happy); }
+.g.sad { border-radius: 2.5px; background: var(--sad); }
+
+/* Facts */
+.facts { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; font-size: 14px; }
+.facts li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; }
+.facts .gg { display: flex; gap: 3px; padding-top: 5px; }
+.facts .gg .g { width: 8px; height: 8px; }
+.facts b { font-weight: 650; }
+.link {
+  border: 0; background: none; padding: 0; cursor: pointer; color: inherit;
+  font-weight: 600; text-decoration: underline; text-decoration-thickness: 1px;
+  text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+}
+.link:hover { text-decoration-color: currentColor; }
+
+/* Place card */
+.card {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 14px 16px 16px; box-shadow: var(--shadow);
+  display: grid; gap: 6px;
+}
+.card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 4px 10px 4px 8px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 650; letter-spacing: .02em;
+}
+.card[data-kind="happy"] .badge { background: var(--happy-soft); color: var(--happy); }
+.card[data-kind="sad"] .badge { background: var(--sad-soft); color: var(--sad); }
+.step { display: flex; gap: 4px; }
+.step button {
+  border: 1px solid var(--line); background: var(--panel); border-radius: 8px;
+  height: 30px; min-width: 30px; padding: 0 8px; cursor: pointer; font-size: 12.5px; font-weight: 600;
+  font-variant-numeric: tabular-nums; color: var(--muted);
+}
+.step button:hover { color: var(--ink); border-color: var(--muted); }
+.card h2 { margin: 6px 0 0; font: 600 20px/1.2 var(--display); letter-spacing: -.01em; text-wrap: balance; }
+.card .meta { margin: 0; color: var(--muted); font-size: 13.5px; }
+.card .near { margin: 6px 0 0; font-size: 14px; }
+.card .out { margin-top: 4px; font-size: 13.5px; font-weight: 600; color: var(--muted); text-decoration: none; }
+.card .out:hover { color: var(--ink); text-decoration: underline; }
+
+/* Ranked lists */
+.lists { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.lists.one { grid-template-columns: 1fr; }
+.col { min-width: 0; }
+.col h3 {
+  margin: 0 0 6px; display: flex; align-items: center; gap: 8px;
+  font: 600 12px/1.2 var(--display); letter-spacing: .04em; text-transform: uppercase;
+}
+.col.happy h3 { color: var(--happy); }
+.col.sad h3 { color: var(--sad); }
+.col ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 1px; }
+.row {
+  width: 100%; border: 0; background: transparent; cursor: pointer; text-align: left;
+  display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 8px; align-items: center;
+  padding: 4px 6px 4px 4px; border-radius: 8px; font-size: 14px; line-height: 1.25;
+}
+.row .r {
+  display: grid; place-items: center; width: 22px; height: 22px;
+  font-size: 11px; font-weight: 700; color: var(--on-mark); font-variant-numeric: tabular-nums;
+}
+.col.happy .row .r { background: var(--happy); border-radius: 50%; }
+.col.sad .row .r { background: var(--sad); border-radius: 5px; }
+.col.happy .row:hover, .col.happy .row.on { background: var(--happy-soft); }
+.col.sad .row:hover, .col.sad .row.on { background: var(--sad-soft); }
+.row.on { font-weight: 650; }
+
+.foot { margin-top: auto; padding-top: 6px; font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
+.foot p { margin: 0; }
+
+/* Map */
+.mapwrap {
+  position: relative; min-height: 0; overflow: hidden;
+  border-radius: 16px; border: 1px solid var(--line); background: var(--sea);
+}
+#map { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+#map:active { cursor: grabbing; }
+.land { fill: var(--land); stroke: var(--coast); stroke-width: .8; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
+.land.far { fill: var(--land-far); }
+.borough { fill: var(--borough); stroke: var(--borough-line); stroke-width: .6; vector-effect: non-scaling-stroke; }
+.borough.happy { fill: var(--happy-soft); stroke: var(--happy); stroke-width: .9; }
+.borough.sad { fill: var(--sad-soft); stroke: var(--sad); stroke-width: .9; }
+.lbox { fill: transparent; stroke: var(--ink); stroke-opacity: .5; stroke-width: 1.2; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; cursor: zoom-in; }
+.nation { font: 600 10.5px var(--body); letter-spacing: .24em; fill: var(--muted); text-anchor: middle; dominant-baseline: central; pointer-events: none; opacity: .8; }
+
+.mk { cursor: pointer; }
+.mk .shape { stroke: var(--halo); stroke-width: 2; transition: transform .15s; }
+.mk.happy .shape { fill: var(--happy); }
+.mk.sad .shape { fill: var(--sad); }
+.mk .num { font: 700 10.5px var(--body); fill: var(--on-mark); text-anchor: middle; dominant-baseline: central; pointer-events: none; font-variant-numeric: tabular-nums; }
+.mk .lbl { font: 600 12px var(--body); fill: var(--ink); dominant-baseline: central; paint-order: stroke; stroke: var(--halo); stroke-width: 3.5px; stroke-linejoin: round; pointer-events: none; }
+.mk .ring { fill: none; stroke-width: 2.5; opacity: 0; }
+.mk .lead { stroke: var(--muted); stroke-width: 1; opacity: .8; }
+.mk .anchor { fill: var(--ink); }
+.mk.happy .anchor { fill: var(--happy); }
+.mk.sad .anchor { fill: var(--sad); }
+.mk.happy .ring { stroke: var(--happy); }
+.mk.sad .ring { stroke: var(--sad); }
+.mk.sel .ring { opacity: 1; }
+.mk.sel .lbl { font-weight: 700; }
+.mk.hl .shape, .mk:hover .shape { stroke: var(--ink); }
+.mk.dot .shape { transform: scale(.42); }
+.mk.dot .num, .mk.dot .lbl, .mk.dot .ring, .mk.dot .lead, .mk.dot .anchor { display: none; }
+.mk.off { display: none; }
+
+.ctrls { position: absolute; left: 12px; top: 12px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.ctrls .zz { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel); box-shadow: var(--shadow); }
+.ctrls .zz button { width: 34px; height: 34px; border: 0; background: transparent; cursor: pointer; font-size: 18px; line-height: 1; }
+.ctrls .zz button + button { border-top: 1px solid var(--line); }
+.ctrls .zz button:hover, .ctrls .txt:hover { background: var(--bg); }
+.ctrls .txt { border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); border-radius: 10px; padding: 6px 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+.legend {
+  position: absolute; left: 12px; bottom: 12px;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow);
+  padding: 7px 11px; font-size: 12.5px; font-weight: 500; max-width: calc(100% - 24px);
+}
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .hint { color: var(--muted); font-weight: 400; }
+
+.inset {
+  position: absolute; right: 12px; top: 12px; width: clamp(160px, 36%, 340px);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow);
+  padding: 7px 7px 7px;
+}
+.inset-title { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; padding: 0 3px 6px; font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.inset-title button { border: 0; background: none; padding: 0; font: inherit; letter-spacing: .04em; color: var(--ink); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; text-transform: none; font-weight: 600; font-size: 11.5px; }
+#inset { display: block; width: 100%; aspect-ratio: 1.6; border-radius: 8px; background: var(--sea); max-width: 100%; }
+#inset .mk .num { font-size: 9.5px; }
+#inset .mk .lbl { font-size: 11px; }
+
+.tip {
+  position: absolute; z-index: 5; pointer-events: none;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 9px; box-shadow: var(--shadow);
+  padding: 6px 10px; font-size: 13px; line-height: 1.3; white-space: nowrap;
+  transform: translate(-50%, calc(-100% - 14px));
+}
+.tip small { display: block; color: var(--muted); font-size: 12px; }
+
+/* Phones and narrow tablets: map first, page scrolls */
+@media (max-width: 860px) {
+  html, body { height: auto; }
+  .app { height: auto; display: flex; flex-direction: column; gap: 16px; }
+  .side { display: contents; }
+  .head { order: 1; }
+  .mapwrap { order: 2; height: min(150vw, 80vh); min-height: 440px; }
+  .card { order: 3; }
+  .facts { order: 4; }
+  .lists { order: 5; }
+  .foot { order: 6; }
+  .legend .hint { display: none; }
+  .inset { width: clamp(150px, 44%, 300px); }
+}
+@media (max-width: 560px) {
+  .legend { display: none; }
+  .inset-title .opt { display: none; }
+}
+@media (max-width: 420px) {
+  .seg { gap: 2px; }
+  .seg button { padding: 7px 9px; }
+  .seg button span { display: none; }
+}
+@media (max-width: 340px) {
+  .lists { grid-template-columns: 1fr; }
+}
+
+/* Poster: fixed 1080×1350 card for sharing as an image */
+html.poster, html.poster body { height: auto; }
+html.poster body { width: 1080px; height: 1350px; padding: 46px 50px 34px; overflow: hidden; }
+.poster .app { height: 100%; grid-template-columns: 548px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto auto; grid-template-areas: "head head" "map lists" "map facts" "foot foot"; gap: 22px 34px; }
+.poster .side { display: contents; }
+.poster .head { grid-area: head; }
+.poster .mapwrap { grid-area: map; }
+.poster .lists { grid-area: lists; align-self: start; }
+.poster .facts { grid-area: facts; font-size: 15px; gap: 12px; }
+.poster .foot { grid-area: foot; font-size: 13px; padding-top: 0; }
+.poster .card, .poster .seg, .poster .ctrls, .poster .legend .hint, .poster .facts li.extra, .poster .inset-title button, .poster .foot .noposter { display: none; }
+.poster h1 { font-size: 38px; margin: 14px 0 0; max-width: 24ch; }
+.poster .eyebrow { font-size: 14px; }
+.poster .dek { display: none; }
+.poster .col h3 { font-size: 14px; margin-bottom: 10px; }
+.poster .row { font-size: 15.5px; padding: 3px 4px; gap: 10px; grid-template-columns: 26px minmax(0, 1fr); }
+.poster .row .r { width: 25px; height: 25px; font-size: 12px; }
+.poster .lists { gap: 18px; }
+.poster .inset { width: 270px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mk .shape { transition: none; }
+}
+</style>
+<!--/head-->
+<div class="app">
+  <div class="side">
+    <header class="head">
+      <div class="eyebrow">
+        <svg width="22" height="18" viewBox="0 0 22 18" aria-hidden="true"><rect x="10" y="1" width="2" height="17" rx="1" fill="currentColor"/><path d="M2 3.5 5 1h8v5H5z" fill="var(--happy)"/><path d="M20 10.5 17 8H9v5h8z" fill="var(--sad)"/></svg>
+        Rightmove · Happy at Home Index 2026
+      </div>
+      <h1>Где в Британии живётся <span class="h">счастливее</span> всего, а&nbsp;где <span class="s">нет</span></h1>
+      <p class="dek">25 самых счастливых и 25 самых несчастливых мест по оценкам тысяч жителей. Нажмите на точку или строку в списке.</p>
+      <div class="seg" role="group" aria-label="Какие места показать">
+        <button type="button" id="f-all" data-f="all" aria-pressed="true">Все <span>50</span></button>
+        <button type="button" id="f-happy" data-f="happy" aria-pressed="false"><i class="g happy"></i>Счастливые <span>25</span></button>
+        <button type="button" id="f-sad" data-f="sad" aria-pressed="false"><i class="g sad"></i>Несчастливые <span>25</span></button>
+      </div>
+    </header>
+
+    <ul class="facts" id="facts" aria-label="Наблюдения"></ul>
+
+    <section class="card" id="card" data-kind="happy" aria-live="polite">
+      <div class="card-top">
+        <span class="badge" id="c-badge"></span>
+        <div class="step">
+          <button type="button" id="c-prev" aria-label="Предыдущее место в списке"></button>
+          <button type="button" id="c-next" aria-label="Следующее место в списке"></button>
+        </div>
+      </div>
+      <h2 id="c-name"></h2>
+      <p class="meta" id="c-meta"></p>
+      <p class="near" id="c-near"></p>
+      <a class="out" id="c-out" href="https://www.google.com/maps" target="_blank" rel="noopener">Открыть в Google Картах ↗</a>
+    </section>
+
+    <div class="lists" id="lists">
+      <div class="col happy" id="col-happy">
+        <h3><i class="g happy"></i>Самые счастливые</h3>
+        <ol id="list-happy"></ol>
+      </div>
+      <div class="col sad" id="col-sad">
+        <h3><i class="g sad"></i>Самые несчастливые</h3>
+        <ol id="list-sad"></ol>
+      </div>
+    </div>
+
+    <footer class="foot">
+      <p>Источник: <a href="https://www.rightmove.co.uk/press-centre/?p=5461" target="_blank" rel="noopener">Rightmove, Happy at Home Index 2026</a>.<span class="noposter"> Точки стоят в центрах городов, у лондонских боро в центре района.</span></p>
+      <p class="noposter">Границы: Natural Earth; ONS/OS, © Crown copyright.</p>
+    </footer>
+  </div>
+
+  <section class="mapwrap" id="mapwrap" aria-label="Карта Великобритании">
+    <svg id="map" role="img" aria-label="Карта Великобритании с отмеченными местами из рейтинга"></svg>
+    <div class="ctrls">
+      <div class="zz">
+        <button type="button" id="z-in" aria-label="Приблизить">+</button>
+        <button type="button" id="z-out" aria-label="Отдалить">−</button>
+      </div>
+      <button type="button" class="txt" id="z-all">Вся страна</button>
+      <button type="button" class="txt" id="z-lon">Лондон</button>
+    </div>
+    <div class="inset" id="insetbox">
+      <div class="inset-title"><span>Лондон<span class="opt"> и окрестности</span></span><button type="button" id="inset-zoom">крупнее</button></div>
+      <svg id="inset" role="img" aria-label="Врезка: Лондон и окрестности"></svg>
+    </div>
+    <div class="legend">
+      <span><i class="g happy"></i>Счастливые</span>
+      <span><i class="g sad"></i>Несчастливые</span>
+      <span class="hint">Колёсико или два пальца — масштаб</span>
+    </div>
+    <div class="tip" id="tip" hidden></div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script>
+const LAND = /*@LAND@*/null;
+const LONDON = /*@LONDON@*/null;
+</script>
+<script>
+(() => {
+  const POSTER = window.__POSTER === true || location.hash === '#poster';
+  if (POSTER) document.documentElement.classList.add('poster');
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------- Data ---------- */
+  const NATION = { en: 'Англия', wa: 'Уэльс', sc: 'Шотландия' };
+  // [name, area ('borough' = London borough), nation, lat, lon]
+  const RAW = {
+    happy: [
+      ['Richmond upon Thames', 'borough', 'en'],
+      ['Harrogate', 'North Yorkshire', 'en', 53.9921, -1.5418],
+      ['Cirencester', 'Gloucestershire', 'en', 51.7189, -1.9686],
+      ['Monmouth', 'Monmouthshire', 'wa', 51.8116, -2.7163],
+      ['Hove', 'East Sussex', 'en', 50.8279, -0.1689],
+      ['Chorley', 'Lancashire', 'en', 53.6530, -2.6290],
+      ['Skipton', 'North Yorkshire', 'en', 53.9620, -2.0170],
+      ['Llandrindod Wells', 'Powys', 'wa', 52.2420, -3.3790],
+      ['Horsham', 'West Sussex', 'en', 51.0629, -0.3259],
+      ['Hexham', 'Northumberland', 'en', 54.9719, -2.1018],
+      ['Windsor', 'Berkshire', 'en', 51.4839, -0.6044],
+      ['Kensington and Chelsea', 'borough', 'en'],
+      ['Kingston upon Thames', 'borough', 'en'],
+      ['Lichfield', 'Staffordshire', 'en', 52.6816, -1.8264],
+      ['Woodbridge', 'Suffolk', 'en', 52.0938, 1.3189],
+      ['St Albans', 'Hertfordshire', 'en', 51.7527, -0.3394],
+      ['St Ives', 'Cornwall', 'en', 50.2110, -5.4802],
+      ['Kirkcaldy', 'Fife', 'sc', 56.1107, -3.1674],
+      ['Stockport', 'Greater Manchester', 'en', 53.4106, -2.1575],
+      ['Altrincham', 'Greater Manchester', 'en', 53.3878, -2.3490],
+      ['Guildford', 'Surrey', 'en', 51.2362, -0.5704],
+      ['Weymouth', 'Dorset', 'en', 50.6144, -2.4576],
+      ['Hastings', 'East Sussex', 'en', 50.8543, 0.5735],
+      ['Chester', 'Cheshire', 'en', 53.1934, -2.8931],
+      ['Leamington Spa', 'Warwickshire', 'en', 52.2852, -1.5357],
+    ],
+    sad: [
+      ['Barking and Dagenham', 'borough', 'en'],
+      ['Walsall', 'West Midlands', 'en', 52.5862, -1.9829],
+      ['Lewisham', 'borough', 'en'],
+      ['Slough', 'Berkshire', 'en', 51.5105, -0.5950],
+      ['Havering', 'borough', 'en'],
+      ['Clacton-on-Sea', 'Essex', 'en', 51.7898, 1.1530],
+      ['Harrow', 'borough', 'en'],
+      ['Rochester', 'Kent', 'en', 51.3880, 0.5040],
+      ['Croydon', 'borough', 'en'],
+      ['Brent', 'borough', 'en'],
+      ['Rotherham', 'South Yorkshire', 'en', 53.4326, -1.3635],
+      ['Birmingham', 'West Midlands', 'en', 52.4862, -1.8904],
+      ['Wolverhampton', 'West Midlands', 'en', 52.5862, -2.1288],
+      ['Luton', 'Bedfordshire', 'en', 51.8787, -0.4200],
+      ['Hounslow', 'borough', 'en'],
+      ['Maidstone', 'Kent', 'en', 51.2704, 0.5227],
+      ['Rochdale', 'Greater Manchester', 'en', 53.6097, -2.1561],
+      ['Newham', 'borough', 'en'],
+      ['Southend-on-Sea', 'Essex', 'en', 51.5459, 0.7077],
+      ['Peterborough', 'Cambridgeshire', 'en', 52.5695, -0.2405],
+      ['Middlesbrough', 'North Yorkshire', 'en', 54.5742, -1.2350],
+      ['Basildon', 'Essex', 'en', 51.5761, 0.4886],
+      ['Bradford', 'West Yorkshire', 'en', 53.7960, -1.7594],
+      ['Oldham', 'Greater Manchester', 'en', 53.5409, -2.1114],
+      ['Kettering', 'Northamptonshire', 'en', 52.3962, -0.7302],
+    ],
+  };
+  const SHORT = {
+    'Richmond upon Thames': 'Richmond',
+    'Kingston upon Thames': 'Kingston',
+    'Kensington and Chelsea': 'Kensington & Chelsea',
+    'Barking and Dagenham': 'Barking & Dagenham',
+  };
+  const KIND_RU = { happy: 'счастливых', sad: 'несчастливых' };
+  const KIND_LIST = { happy: 'Счастливые', sad: 'Несчастливые' };
+
+  // d3 wants clockwise outer rings; fix any polygon that came out inverted.
+  function fixWinding(fc) {
+    for (const f of fc.features) {
+      const g = f.geometry;
+      const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates;
+      for (const rings of polys) {
+        if (d3.geoArea({ type: 'Polygon', coordinates: rings }) > 2 * Math.PI) rings.forEach(r => r.reverse());
+      }
+    }
+    return fc;
+  }
+  fixWinding(LAND); fixWinding(LONDON);
+  const UK = LAND.features.filter(f => String(f.id) === '826');
+
+  const slugify = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const boroughByName = new Map(LONDON.features.map(f => [f.properties.name, f]));
+  const boroughKind = new Map();
+
+  // London box shown in the inset: [west, south], [east, north]
+  const LBOX = [[-0.68, 51.29], [0.36, 51.70]];
+  const inLBox = (lon, lat) => lon >= LBOX[0][0] && lon <= LBOX[1][0] && lat >= LBOX[0][1] && lat <= LBOX[1][1];
+
+  const PLACES = [];
+  for (const kind of ['happy', 'sad']) {
+    RAW[kind].forEach((r, i) => {
+      const [name, area, nat, lat, lon] = r;
+      const borough = area === 'borough';
+      const ll = borough ? d3.geoCentroid(boroughByName.get(name)) : [lon, lat];
+      if (borough) boroughKind.set(name, kind);
+      PLACES.push({
+        id: kind + (i + 1), kind, rank: i + 1, name, short: SHORT[name] || name,
+        borough, area: borough ? 'Боро Лондона' : area, nation: NATION[nat],
+        lon: ll[0], lat: ll[1], slug: slugify(name), inBox: inLBox(ll[0], ll[1]),
+      });
+    });
+  }
+  const byId = new Map(PLACES.map(p => [p.id, p]));
+  const bySlug = new Map(PLACES.map(p => [p.slug, p]));
+  const listOf = kind => PLACES.filter(p => p.kind === kind);
+
+  const R_EARTH = 6371;
+  const km = (a, b) => d3.geoDistance([a.lon, a.lat], [b.lon, b.lat]) * R_EARTH;
+  const nearestOther = p => {
+    let best = null, bd = Infinity;
+    for (const q of PLACES) if (q.kind !== p.kind) { const d = km(p, q); if (d < bd) { bd = d; best = q; } }
+    return { q: best, d: bd };
+  };
+  const fmtKm = d => d < 1 ? 'меньше 1 км' : (d < 10 ? Math.round(d) + ' км' : Math.round(d / 5) * 5 + ' км');
+
+  /* ---------- State ---------- */
+  const state = { filter: 'all', sel: byId.get('happy1'), hover: null };
+  const visible = p => state.filter === 'all' || state.filter === p.kind;
+
+  /* ---------- Text measuring for label placement ---------- */
+  const mctx = document.createElement('canvas').getContext('2d');
+  const BODY_FONT = getComputedStyle(document.documentElement).getPropertyValue('--body') || 'sans-serif';
+  const textW = (s, px, weight) => { mctx.font = `${weight} ${px}px ${BODY_FONT}`; return mctx.measureText(s).width; };
+  const hit = (a, b) => a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
+
+  function placeLabels(items, obstacles, bounds, px) {
+    const placed = obstacles.slice();
+    const h = px + 3, gap = 3;
+    for (const it of items) {
+      const w = it.w;
+      const { x, y, r } = it;
+      const k = r * .78, dg = k + h / 2 - 2;
+      // right, left, above, below, then the four diagonals
+      const cands = [
+        [r + gap, 0, 'start'], [-r - gap, 0, 'end'], [0, -r - gap - h / 2, 'middle'], [0, r + gap + h / 2, 'middle'],
+        [k + 1, -dg, 'start'], [k + 1, dg, 'start'], [-k - 1, -dg, 'end'], [-k - 1, dg, 'end'],
+      ].map(([dx, dy, a]) => {
+        const x0 = a === 'start' ? x + dx : a === 'end' ? x + dx - w : x + dx - w / 2;
+        return { dx, dy, a, b: [x0, y + dy - h / 2, x0 + w, y + dy + h / 2] };
+      });
+      let ok = null;
+      for (const c of cands) {
+        const inside = c.b[0] >= bounds[0] && c.b[1] >= bounds[1] && c.b[2] <= bounds[2] && c.b[3] <= bounds[3];
+        if (inside && !placed.some(o => hit(o, c.b))) { ok = c; break; }
+      }
+      if (ok) {
+        placed.push([ok.b[0] - 3, ok.b[1] - 1, ok.b[2] + 3, ok.b[3] + 1]);
+        it.el.attr('x', ok.dx).attr('y', ok.dy).attr('text-anchor', ok.a).style('display', null);
+      }
+      else it.el.style('display', 'none');
+    }
+  }
+  // Push overlapping markers apart; each keeps a leader line to its true location.
+  function dodge(nodes) {
+    if (!nodes.length) return;
+    const sim = d3.forceSimulation(nodes)
+      .force('x', d3.forceX(n => n.tx).strength(.2))
+      .force('y', d3.forceY(n => n.ty).strength(.2))
+      .force('c', d3.forceCollide(n => n.r).iterations(4))
+      .stop();
+    for (let i = 0; i < 220; i++) sim.tick();
+    for (const n of nodes) {
+      const dx = n.x - n.tx, dy = n.y - n.ty;
+      n.off = Math.hypot(dx, dy) < 1.5 ? [0, 0] : [dx, dy];
+    }
+  }
+  function setLeads(sel, key) {
+    const has = d => d[key] && Math.hypot(d[key][0], d[key][1]) > 0;
+    sel.select('.lead').attr('x1', 0).attr('y1', 0)
+      .attr('x2', d => has(d) ? -d[key][0] : 0).attr('y2', d => has(d) ? -d[key][1] : 0)
+      .style('display', d => has(d) ? null : 'none');
+    sel.select('.anchor').attr('cx', d => has(d) ? -d[key][0] : 0).attr('cy', d => has(d) ? -d[key][1] : 0)
+      .style('display', d => has(d) ? null : 'none');
+  }
+
+  // Selected place first, then alternate the two lists by rank so both get labels fairly.
+  const labelOrder = (a, b) => (b === state.sel) - (a === state.sel) || a.rank - b.rank || (a.kind === 'happy' ? -1 : 1);
+
+  /* ---------- Marker factory ---------- */
+  function drawMarkers(g, r) {
+    const sel = g.selectAll('g.mk').data(PLACES, d => d.id).join(enter => {
+      const m = enter.append('g').attr('class', d => 'mk ' + d.kind);
+      m.each(function (d) {
+        const s = d3.select(this);
+        s.append('line').attr('class', 'lead');
+        s.append('circle').attr('class', 'anchor').attr('r', 2.2);
+        if (d.kind === 'happy') {
+          s.append('circle').attr('class', 'ring');
+          s.append('circle').attr('class', 'shape');
+        } else {
+          s.append('rect').attr('class', 'ring');
+          s.append('rect').attr('class', 'shape');
+        }
+        s.append('text').attr('class', 'num').text(d.rank);
+        s.append('text').attr('class', 'lbl').text(d.short);
+      });
+      return m;
+    });
+    sel.select('circle.shape').attr('r', r);
+    sel.select('circle.ring').attr('r', r + 4);
+    sel.select('rect.shape').attr('x', -r * .92).attr('y', -r * .92).attr('width', r * 1.84).attr('height', r * 1.84).attr('rx', r * .38);
+    sel.select('rect.ring').attr('x', -r * .92 - 4).attr('y', -r * .92 - 4).attr('width', r * 1.84 + 8).attr('height', r * 1.84 + 8).attr('rx', r * .5);
+    sel.on('click', (e, d) => { e.stopPropagation(); select(d, { fly: false, from: 'map' }); })
+      .on('mouseenter', (e, d) => showTip(d, e.currentTarget))
+      .on('mouseleave', () => hideTip());
+    // rank 1 on top
+    sel.sort((a, b) => b.rank - a.rank);
+    return sel;
+  }
+
+  /* ---------- Main map ---------- */
+  const wrap = document.getElementById('mapwrap');
+  const svg = d3.select('#map');
+  const gGeo = svg.append('g');
+  const gLand = gGeo.append('g');
+  const gBor = gGeo.append('g');
+  const gBox = gGeo.append('g');
+  const gNat = svg.append('g');
+  const gMk = svg.append('g');
+  const proj = d3.geoTransverseMercator().rotate([2, 0]); // central meridian 2°W, like the British National Grid
+  const FRAME = { type: 'MultiPoint', coordinates: [[-5.9, 49.9], [2.3, 49.9], [-5.9, 58.7], [2.3, 58.7], [-3, 58.75], [-3, 49.85]] };
+  const NATIONS = [
+    ['ШОТЛАНДИЯ', -4.35, 57.2], ['АНГЛИЯ', -0.4, 53.15], ['УЭЛЬС', -3.85, 52.72],
+    ['СЕВ. ИРЛАНДИЯ', -6.65, 54.63], ['ИРЛАНДИЯ', -8.0, 53.0], ['ФРАНЦИЯ', 0.9, 49.55],
+  ];
+  let W = 0, H = 0, t = d3.zoomIdentity, boxW0 = 1, mk, R = 10;
+
+  const zoom = d3.zoom().scaleExtent([1, 60])
+    .on('zoom', e => { t = e.transform; applyZoom(); hideTip(); })
+    .on('end', () => scheduleLabels());
+  svg.call(zoom);
+  svg.on('click', () => hideTip());
+
+  const lowLondon = () => boxW0 * t.k < 300;
+  const mpos = d => { const [x, y] = t.apply(d.xy); const o = d.off || [0, 0]; return [x + o[0], y + o[1]]; };
+
+  function declutterMain() {
+    const low = lowLondon(), nodes = [];
+    for (const d of PLACES) {
+      d.off = [0, 0];
+      if (!visible(d)) continue;
+      const [x, y] = t.apply(d.xy);
+      if (x < -60 || y < -60 || x > W + 60 || y > H + 60) continue;
+      const dot = d.inBox && low;
+      nodes.push({ d, x, y, tx: x, ty: y, r: dot ? R * .42 + 1 : R + 1.5, fx: dot ? x : null, fy: dot ? y : null });
+    }
+    dodge(nodes);
+    nodes.forEach(n => { n.d.off = n.off; });
+  }
+
+  function layoutMain() {
+    const r = wrap.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    W = r.width; H = r.height;
+    svg.attr('viewBox', `0 0 ${W} ${H}`);
+    const pad = POSTER ? 6 : 22;
+    proj.fitExtent([[pad, pad], [W - pad, H - pad]], FRAME);
+    const path = d3.geoPath(proj);
+    gLand.selectAll('path').data(LAND.features).join('path')
+      .attr('class', f => 'land' + (String(f.id) === '826' ? '' : ' far')).attr('d', path);
+    gBor.selectAll('path').data(LONDON.features).join('path')
+      .attr('class', f => 'borough ' + (boroughKind.get(f.properties.name) || '')).attr('d', path);
+    const c = [proj(LBOX[0]), proj([LBOX[1][0], LBOX[0][1]]), proj(LBOX[1]), proj([LBOX[0][0], LBOX[1][1]])];
+    const xs = c.map(p => p[0]), ys = c.map(p => p[1]);
+    const bx = [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)];
+    boxW0 = bx[2] - bx[0];
+    gBox.selectAll('rect').data([0]).join('rect').attr('class', 'lbox')
+      .attr('x', bx[0]).attr('y', bx[1]).attr('width', bx[2] - bx[0]).attr('height', bx[3] - bx[1])
+      .on('click', e => { e.stopPropagation(); zoomLondon(); });
+    gNat.selectAll('text').data(NATIONS).join('text').attr('class', 'nation').text(d => d[0]);
+    PLACES.forEach(p => { p.xy = proj([p.lon, p.lat]); });
+    R = POSTER ? 11 : (W < 520 ? 9 : 10);
+    mk = drawMarkers(gMk, R);
+    zoom.extent([[0, 0], [W, H]]).translateExtent([[-W * .6, -H * .6], [W * 1.6, H * 1.6]]);
+    applyZoom();
+    scheduleLabels();
+  }
+
+  function applyZoom() {
+    if (!mk) return;
+    gGeo.attr('transform', t);
+    const low = lowLondon();
+    mk.attr('transform', d => { const [x, y] = mpos(d); return `translate(${x},${y})`; })
+      .classed('dot', d => d.inBox && low)
+      .classed('off', d => !visible(d))
+      .classed('sel', d => d === state.sel);
+    gNat.selectAll('text').each(function (d) {
+      const [x, y] = t.apply(proj([d[1], d[2]]));
+      const w = textW(d[0], 10.5, 600) + d[0].length * 10.5 * .24;
+      const out = x - w / 2 < 6 || x + w / 2 > W - 6 || y < 10 || y > H - 10;
+      d3.select(this).attr('x', x).attr('y', y).style('display', t.k > 3.2 || out ? 'none' : null);
+    });
+    gBox.style('display', low ? null : 'none');
+  }
+
+  function overlayBoxes() {
+    const sr = svg.node().getBoundingClientRect();
+    return [...wrap.querySelectorAll('.ctrls, .legend, .inset')]
+      .filter(el => el.offsetParent !== null)
+      .map(el => { const r = el.getBoundingClientRect(); return [r.left - sr.left - 4, r.top - sr.top - 4, r.right - sr.left + 4, r.bottom - sr.top + 4]; });
+  }
+
+  function labelMain() {
+    if (!mk) return;
+    declutterMain();
+    mk.interrupt().transition().duration(dur(220)).attr('transform', d => { const [x, y] = mpos(d); return `translate(${x},${y})`; });
+    setLeads(mk, 'off');
+    const px = POSTER ? 13.5 : 12;
+    mk.select('.lbl').style('font-size', px + 'px');
+    const low = lowLondon();
+    const shown = [], obstacles = overlayBoxes();
+    mk.each(function (d) {
+      const [x, y] = mpos(d);
+      const on = visible(d) && x > -20 && y > -20 && x < W + 20 && y < H + 20;
+      if (!on) { d3.select(this).select('.lbl').style('display', 'none'); return; }
+      const rr = d.inBox && low ? R * .42 : R;
+      obstacles.push([x - rr - 1, y - rr - 1, x + rr + 1, y + rr + 1]);
+      if (d.off[0] || d.off[1]) { const [ax, ay] = t.apply(d.xy); obstacles.push([ax - 3, ay - 3, ax + 3, ay + 3]); }
+      if (d.inBox && low) { d3.select(this).select('.lbl').style('display', 'none'); return; }
+      shown.push({ d, x, y, r: R + 1, w: textW(d.short, px, d === state.sel ? 700 : 600), el: d3.select(this).select('.lbl') });
+    });
+    if (t.k <= 3.2) {
+      gNat.selectAll('text').each(function () {
+        const b = this.getBBox();
+        if (b.width) obstacles.push([b.x - 2, b.y - 1, b.x + b.width + 2, b.y + b.height + 1]);
+      });
+    }
+    shown.sort((a, b) => labelOrder(a.d, b.d));
+    placeLabels(shown, obstacles, [4, 4, W - 4, H - 4], px);
+  }
+
+  /* ---------- London inset ---------- */
+  const isvg = d3.select('#inset');
+  const igLand = isvg.append('g'), igBor = isvg.append('g'), igMk = isvg.append('g');
+  let imk, iproj, iw = 0, ih = 0, IR = 8;
+
+  function layoutInset() {
+    const r = isvg.node().getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    iw = r.width; ih = r.height;
+    isvg.attr('viewBox', `0 0 ${iw} ${ih}`);
+    const boxPoly = { type: 'MultiPoint', coordinates: [LBOX[0], LBOX[1], [LBOX[0][0], LBOX[1][1]], [LBOX[1][0], LBOX[0][1]]] };
+    iproj = d3.geoMercator().fitExtent([[0, 0], [iw, ih]], boxPoly);
+    const path = d3.geoPath(iproj);
+    igLand.selectAll('path').data(UK).join('path').attr('class', 'land').attr('d', path);
+    igBor.selectAll('path').data(LONDON.features).join('path')
+      .attr('class', f => 'borough ' + (boroughKind.get(f.properties.name) || '')).attr('d', path);
+    IR = POSTER ? 9.5 : (iw < 220 ? 7 : 8.5);
+    imk = drawMarkers(igMk, IR);
+    applyInset();
+  }
+
+  function applyInset() {
+    if (!imk) return;
+    imk.classed('off', d => !d.inBox || !visible(d)).classed('sel', d => d === state.sel);
+    const nodes = [];
+    for (const d of PLACES) {
+      d.ioff = [0, 0];
+      if (!d.inBox || !visible(d)) continue;
+      const [x, y] = iproj([d.lon, d.lat]);
+      nodes.push({ d, x, y, tx: x, ty: y, r: IR + 1.2 });
+    }
+    dodge(nodes);
+    nodes.forEach(n => { n.d.ioff = n.off; });
+    const ipos = d => { const [x, y] = iproj([d.lon, d.lat]); return [x + d.ioff[0], y + d.ioff[1]]; };
+    imk.attr('transform', d => { const [x, y] = ipos(d); return `translate(${x},${y})`; });
+    setLeads(imk, 'ioff');
+    const px = POSTER ? 12 : 11;
+    imk.select('.lbl').style('font-size', px + 'px');
+    if (iw < 230) { imk.select('.lbl').style('display', 'none'); return; }
+    const items = [], obstacles = [];
+    imk.each(function (d) {
+      if (!d.inBox || !visible(d)) return;
+      const [x, y] = ipos(d);
+      obstacles.push([x - IR - 1, y - IR - 1, x + IR + 1, y + IR + 1]);
+      items.push({ d, x, y, r: IR + 1, w: textW(d.short, px, 600), el: d3.select(this).select('.lbl') });
+    });
+    items.sort((a, b) => labelOrder(a.d, b.d));
+    placeLabels(items, obstacles, [2, 2, iw - 2, ih - 2], px);
+  }
+
+  /* ---------- Zoom helpers ---------- */
+  const dur = ms => reduceMotion ? 0 : ms;
+  function zoomTo(k, x, y) {
+    const target = d3.zoomIdentity.translate(W / 2, H / 2).scale(k).translate(-x, -y);
+    svg.transition().duration(dur(750)).call(zoom.transform, target);
+  }
+  function zoomLondon() {
+    const c = proj([(LBOX[0][0] + LBOX[1][0]) / 2, (LBOX[0][1] + LBOX[1][1]) / 2]);
+    zoomTo(Math.min(60, Math.max(1, (W * .92) / boxW0)), c[0], c[1]);
+  }
+  function flyTo(p) {
+    const k = p.inBox ? Math.max(t.k, Math.min(60, 520 / boxW0)) : Math.max(t.k, 4.5);
+    zoomTo(k, p.xy[0], p.xy[1]);
+  }
+  document.getElementById('z-in').onclick = () => svg.transition().duration(dur(300)).call(zoom.scaleBy, 1.8);
+  document.getElementById('z-out').onclick = () => svg.transition().duration(dur(300)).call(zoom.scaleBy, 1 / 1.8);
+  document.getElementById('z-all').onclick = () => svg.transition().duration(dur(750)).call(zoom.transform, d3.zoomIdentity);
+  document.getElementById('z-lon').onclick = zoomLondon;
+  document.getElementById('inset-zoom').onclick = zoomLondon;
+
+  /* ---------- Tooltip ---------- */
+  const tip = document.getElementById('tip');
+  function showTip(p, el) {
+    if (!el || POSTER) return;
+    const wr = wrap.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (r.bottom < wr.top || r.top > wr.bottom || r.right < wr.left || r.left > wr.right) return;
+    tip.innerHTML = '';
+    const b = document.createElement('b'); b.textContent = `№${p.rank} ${p.name}`;
+    const s = document.createElement('small'); s.textContent = `${KIND_LIST[p.kind]} · ${p.area}`;
+    tip.append(b, s);
+    tip.style.left = (r.left + r.width / 2 - wr.left) + 'px';
+    tip.style.top = (r.top - wr.top) + 'px';
+    tip.hidden = false;
+  }
+  function hideTip() { tip.hidden = true; }
+  function markerEl(p) {
+    // Prefer the inset marker for London-area places while the main map shows them as dots
+    if (p.inBox && lowLondon() && imk) { const n = imk.filter(d => d === p).node(); if (n) return n; }
+    return mk ? mk.filter(d => d === p).node() : null;
+  }
+
+  /* ---------- Lists ---------- */
+  const rows = new Map();
+  for (const kind of ['happy', 'sad']) {
+    const ol = document.getElementById('list-' + kind);
+    for (const p of listOf(kind)) {
+      const li = document.createElement('li');
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'row'; b.id = 'row-' + p.slug;
+      const r = document.createElement('span'); r.className = 'r'; r.textContent = p.rank;
+      const n = document.createElement('span'); n.textContent = p.name;
+      b.append(r, n);
+      b.addEventListener('click', () => select(p, { fly: true, from: 'list' }));
+      b.addEventListener('mouseenter', () => { setHover(p); showTip(p, markerEl(p)); });
+      b.addEventListener('mouseleave', () => { setHover(null); hideTip(); });
+      li.append(b); ol.append(li);
+      rows.set(p, b);
+    }
+  }
+  function setHover(p) {
+    state.hover = p;
+    mk && mk.classed('hl', d => d === p);
+    imk && imk.classed('hl', d => d === p);
+  }
+
+  /* ---------- Facts ---------- */
+  function buildFacts() {
+    const ul = document.getElementById('facts');
+    const lonH = PLACES.filter(p => p.kind === 'happy' && p.borough).length;
+    const lonS = PLACES.filter(p => p.kind === 'sad' && p.borough).length;
+    const outH = PLACES.filter(p => p.kind === 'happy' && p.nation !== 'Англия');
+    const outS = PLACES.filter(p => p.kind === 'sad' && p.nation !== 'Англия');
+    let pair = null, pd = Infinity;
+    for (const a of listOf('happy')) for (const b of listOf('sad')) { const d = km(a, b); if (d < pd) { pd = d; pair = [a, b]; } }
+
+    const glyphs = kinds => `<span class="gg">${kinds.map(k => `<i class="g ${k}"></i>`).join('')}</span>`;
+    const btn = p => `<a class="link" href="#${p.slug}" data-id="${p.id}">${p.name}</a>`;
+    const items = [
+      [['sad'], `<b>${lonS} из 25</b> несчастливых мест находятся в Лондоне. Среди счастливых лондонских боро ${lonH}.`],
+      [['happy'], outS.length === 0
+        ? `<b>Уэльс и Шотландия</b> попали только в счастливый список: ${outH.map(btn).join(', ')}.`
+        : `За пределами Англии: ${outH.length} счастливых и ${outS.length} несчастливых мест.`],
+      [['happy', 'sad'], `${btn(pair[0])} (№${pair[0].rank} среди счастливых) и ${btn(pair[1])} (№${pair[1].rank} среди несчастливых) разделяет всего <b>${fmtKm(pd)}</b>.`],
+    ];
+    const gm = ['Stockport', 'Altrincham', 'Rochdale', 'Oldham'].map(n => PLACES.find(p => p.name === n));
+    items.push([['happy', 'sad'], `Большой Манчестер разделился: юг в счастливых (${btn(gm[0])}, ${btn(gm[1])}), север в несчастливых (${btn(gm[2])}, ${btn(gm[3])}).`, 'extra']);
+    ul.innerHTML = items.map(([k, html, cls]) => `<li${cls ? ` class="${cls}"` : ''}>${glyphs(k)}<span>${html}</span></li>`).join('');
+    ul.addEventListener('click', e => {
+      const b = e.target.closest('[data-id]');
+      if (b) { e.preventDefault(); select(byId.get(b.dataset.id), { fly: true, from: 'list' }); }
+    });
+  }
+
+  /* ---------- Card ---------- */
+  const card = document.getElementById('card');
+  function renderCard() {
+    const p = state.sel;
+    card.dataset.kind = p.kind;
+    const badge = document.getElementById('c-badge');
+    badge.innerHTML = `<i class="g ${p.kind}"></i>№${p.rank} среди ${KIND_RU[p.kind]}`;
+    document.getElementById('c-name').textContent = p.name;
+    document.getElementById('c-meta').textContent = `${p.area} · ${p.nation}`;
+    const { q, d } = nearestOther(p);
+    const near = document.getElementById('c-near');
+    near.innerHTML = `Ближайшее место из другого списка: <a class="link" href="#${q.slug}" data-id="${q.id}">${q.name}</a>, №${q.rank} среди ${KIND_RU[q.kind]}, в ${fmtKm(d)}.`;
+    const list = listOf(p.kind);
+    const prev = list[(p.rank - 2 + 25) % 25], next = list[p.rank % 25];
+    const bp = document.getElementById('c-prev'), bn = document.getElementById('c-next');
+    bp.textContent = `← №${prev.rank}`; bp.title = prev.name; bp.dataset.id = prev.id;
+    bn.textContent = `№${next.rank} →`; bn.title = next.name; bn.dataset.id = next.id;
+    const q2 = p.borough ? `London Borough of ${p.name}` : `${p.name}, ${p.area}, UK`;
+    document.getElementById('c-out').href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q2);
+  }
+  card.addEventListener('click', e => {
+    const b = e.target.closest('[data-id]');
+    if (b) { e.preventDefault(); select(byId.get(b.dataset.id), { fly: true, from: 'card' }); }
+  });
+
+  /* ---------- Selection, filter, hash ---------- */
+  const stacked = () => window.matchMedia('(max-width: 860px)').matches;
+  function select(p, { fly = false, from = '', hash = true } = {}) {
+    if (!p) return;
+    if (!visible(p)) setFilter('all');
+    state.sel = p;
+    for (const [q, b] of rows) b.classList.toggle('on', q === p);
+    if (from !== 'list' && !stacked() && !POSTER) rows.get(p).scrollIntoView({ block: 'nearest' });
+    renderCard();
+    applyZoom(); applyInset();
+    mk && mk.filter(d => d === p).raise();
+    imk && imk.filter(d => d === p).raise();
+    if (fly) flyTo(p); else scheduleLabels();
+    if (hash) { try { history.replaceState(null, '', '#' + p.slug); } catch (e) { /* ignore */ } }
+    if (from === 'list' && stacked()) {
+      const r = wrap.getBoundingClientRect();
+      if (r.bottom < 80 || r.top > window.innerHeight - 80) wrap.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    }
+  }
+  function setFilter(f) {
+    state.filter = f;
+    document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.f === f)));
+    document.getElementById('col-happy').hidden = f === 'sad';
+    document.getElementById('col-sad').hidden = f === 'happy';
+    document.getElementById('lists').classList.toggle('one', f !== 'all');
+    applyZoom(); applyInset(); scheduleLabels();
+  }
+  document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => setFilter(b.dataset.f)));
+
+  window.addEventListener('hashchange', () => {
+    const p = bySlug.get(location.hash.slice(1));
+    if (p && p !== state.sel) select(p, { fly: true, hash: false });
+  });
+
+  /* ---------- Labels scheduling & resize ---------- */
+  let raf = 0;
+  function scheduleLabels() {
+    cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(() => { labelMain(); applyInset(); });
+  }
+  let rraf = 0;
+  const ro = new ResizeObserver(() => {
+    cancelAnimationFrame(rraf);
+    rraf = requestAnimationFrame(() => { layoutMain(); layoutInset(); });
+  });
+  ro.observe(wrap); ro.observe(isvg.node());
+
+  /* ---------- Boot ---------- */
+  buildFacts();
+  layoutMain(); layoutInset();
+  const fromHash = bySlug.get(location.hash.slice(1));
+  select(fromHash || state.sel, { fly: false, hash: false });
+  if (fromHash) setTimeout(() => flyTo(fromHash), 60);
+  const done = () => { layoutMain(); layoutInset(); requestAnimationFrame(() => { labelMain(); applyInset(); window.__ready = true; }); };
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(done, done);
+})();
+</script>
