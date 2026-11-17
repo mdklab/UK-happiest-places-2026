@@ -1,0 +1,1 @@
+# UK-happiest-places-2026
